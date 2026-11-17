@@ -26,7 +26,7 @@ expressForm.addEventListener('submit', event => {
   const name = document.querySelector('#customer-name').value.trim();
   const city = document.querySelector('#customer-city').value.trim();
   const phone = document.querySelector('#customer-phone').value.trim();
-  const message = `السلام عليكم الهيبة 🧸❤️\nبغيت نطلب:\n• ${expressProduct.value}\n• الكمية: ${quantity}\n• الثمن: 119 درهم للقطعة\n• مجموع المنتجات: ${quantity * 119} درهم (بلا توصيل)\n\n• الاسم: ${name}\n• المدينة: ${city}\n• الهاتف: ${phone}\n\nعافاكم أكدوا ليا المقاس، التوفر وثمن التوصيل. الدفع عند الاستلام.`;
+  const message = `السلام عليكم لونا بيبي 🧸❤️\nبغيت نطلب:\n• ${expressProduct.value}\n• الكمية: ${quantity}\n• الثمن: 119 درهم للقطعة\n• مجموع المنتجات: ${quantity * 119} درهم (بلا توصيل)\n\n• الاسم: ${name}\n• المدينة: ${city}\n• الهاتف: ${phone}\n\nعافاكم أكدوا ليا المقاس، التوفر وثمن التوصيل. الدفع عند الاستلام.`;
   window.open(`https://wa.me/${STORE_WHATSAPP}?text=${encodeURIComponent(message)}`, '_blank', 'noopener');
 });
 function orderMessage(items) {
@@ -37,7 +37,7 @@ function orderMessage(items) {
     const color = name.split('—').slice(1).join('—').trim();
     return `• اللون: ${color}\n• الكمية: ${quantity}\n• الثمن: 119 درهم للقطعة`;
   }).join('\n\n');
-  return `السلام عليكم الهيبة 🧸❤️\nبغيت نطلب كاش بيبي الشتوي:\n${details}\n• المدينة: ${city}\n${notes ? `\nملاحظة: ${notes}\n` : ''}\nعافاكم أكدوا ليا المقاس، التوفر وثمن التوصيل.`;
+  return `السلام عليكم لونا بيبي 🧸❤️\nبغيت نطلب كاش بيبي الشتوي:\n${details}\n• المدينة: ${city}\n${notes ? `\nملاحظة: ${notes}\n` : ''}\nعافاكم أكدوا ليا المقاس، التوفر وثمن التوصيل.`;
 }
 function render() {
   cart.hidden = false;
@@ -206,7 +206,7 @@ dialog.setAttribute('aria-labelledby', 'basket-title');
 const basketTitle = dialog.querySelector('h2');
 basketTitle.id = 'basket-title';
 basketTitle.textContent = 'سلة مليانة حنان';
-dialog.querySelector('.eyebrow').textContent = 'الهيبة · اختياراتك الحلوة';
+dialog.querySelector('.eyebrow').textContent = 'لونا بيبي · اختياراتك الحلوة';
 const basketHeader = document.createElement('div');
 basketHeader.className = 'basket-heading';
 const basketMark = document.createElement('span');
