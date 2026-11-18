@@ -9,6 +9,46 @@ const pricedProduct = name => name.startsWith('كاش بيبي الدبدوب');
 const expressForm = document.querySelector('#express-form');
 const expressProduct = document.querySelector('#express-product');
 const expressQuantity = document.querySelector('#express-quantity');
+let orderPending = false;
+const productEntries = items => [...items].map(([name, qty]) => {
+  const card = [...document.querySelectorAll('.color-product')].find(card => card.querySelector('[data-product]').dataset.product === name);
+  const image = card?.querySelector('img').getAttribute('src') || '';
+  return { id: image.split('/').pop().replace('-clean.jpg', ''), name: 'كاش بيبي الدبدوب', color: name.split('—').slice(1).join('—').trim(), qty };
+});
+async function checkout(items, customer, source, button, feedback) {
+  if (orderPending) return;
+  let order;
+  try {
+    order = LounaOrders.buildOrder({ entries: productEntries(items), customer, source, page: location.href.split(/[?#]/)[0], orderId: 'LB-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase() });
+  } catch (error) { feedback.textContent = error.message; return; }
+  orderPending = true;
+  const label = button.textContent;
+  button.disabled = true;
+  button.textContent = 'كنرسلو الطلب…';
+  feedback.replaceChildren();
+  try {
+    await LounaOrders.sendOrder(order.payload);
+    const url = `https://wa.me/${STORE_WHATSAPP}?text=${encodeURIComponent(order.message)}`;
+    feedback.textContent = 'تبعثات المعلومات. غادي يتحل واتساب باش تراجعي الطلب وتصيفطيه. ';
+    const fallback = document.createElement('a');
+    fallback.href = url;
+    fallback.textContent = 'فتحي واتساب';
+    feedback.append(fallback);
+    // Same-tab redirect avoids popup blocking after the asynchronous sheet POST.
+    location.assign(url);
+  } catch {
+    feedback.textContent = 'ما قدرناش نكمّلو إرسال المعلومات. تأكدي من الاتصال قبل المحاولة مجدداً. إلا تقطع الاتصال ممكن الطلب يكون تسجّل؛ تواصلي معانا قبل إعادة الإرسال.';
+  } finally {
+    orderPending = false;
+    button.disabled = false;
+    button.textContent = label;
+  }
+}
+const expressFeedback = document.createElement('p');
+expressFeedback.className = 'checkout-feedback';
+expressFeedback.setAttribute('role', 'status');
+expressFeedback.setAttribute('aria-live', 'polite');
+expressForm.append(expressFeedback);
 document.querySelectorAll('.color-product [data-product]').forEach(button => {
   const option = document.createElement('option');
   option.value = button.dataset.product;
@@ -26,19 +66,8 @@ expressForm.addEventListener('submit', event => {
   const name = document.querySelector('#customer-name').value.trim();
   const city = document.querySelector('#customer-city').value.trim();
   const phone = document.querySelector('#customer-phone').value.trim();
-  const message = `السلام عليكم لونا بيبي 🧸❤️\nبغيت نطلب:\n• ${expressProduct.value}\n• الكمية: ${quantity}\n• الثمن: 119 درهم للقطعة\n• مجموع المنتجات: ${quantity * 119} درهم (بلا توصيل)\n\n• الاسم: ${name}\n• المدينة: ${city}\n• الهاتف: ${phone}\n\nعافاكم أكدوا ليا المقاس، التوفر وثمن التوصيل. الدفع عند الاستلام.`;
-  window.open(`https://wa.me/${STORE_WHATSAPP}?text=${encodeURIComponent(message)}`, '_blank', 'noopener');
+  checkout([[expressProduct.value, quantity]], { name, city, phone, address: '' }, 'form', expressForm.querySelector('[type="submit"]'), expressFeedback);
 });
-function orderMessage(items) {
-  const city = document.querySelector('#city')?.value.trim() || '…';
-  const notes = document.querySelector('#notes')?.value.trim();
-  const details = [...items].map(([name, quantity]) => {
-    if (!pricedProduct(name)) return `• المنتوج: ${name}\n• الكمية: ${quantity}\n• الثمن: عند الاستفسار`;
-    const color = name.split('—').slice(1).join('—').trim();
-    return `• اللون: ${color}\n• الكمية: ${quantity}\n• الثمن: 119 درهم للقطعة`;
-  }).join('\n\n');
-  return `السلام عليكم لونا بيبي 🧸❤️\nبغيت نطلب كاش بيبي الشتوي:\n${details}\n• المدينة: ${city}\n${notes ? `\nملاحظة: ${notes}\n` : ''}\nعافاكم أكدوا ليا المقاس، التوفر وثمن التوصيل.`;
-}
 function render() {
   cart.hidden = false;
   document.querySelector('#count').textContent = [...selected.values()].reduce((sum, quantity) => sum + quantity, 0);
@@ -47,7 +76,7 @@ function render() {
     const button = card.querySelector('[data-product]');
     if (button && card.syncQuantity) card.syncQuantity(selected.get(button.dataset.product) || 0);
   });
-  send.disabled = selected.size === 0;
+  send.disabled = selected.size === 0 || orderPending;
   const list = document.querySelector('#order-items');
   list.replaceChildren();
   for (const [name, quantity] of selected) {
@@ -146,8 +175,7 @@ document.querySelectorAll('.product').forEach((card, index) => {
     const quantity = card.readQuantity();
     minus.disabled = quantity <= 0; plus.disabled = quantity >= 99;
     if (direct) {
-      const message = orderMessage([[name, Math.max(1, quantity)]]);
-      direct.href = `https://wa.me/${STORE_WHATSAPP}?text=${encodeURIComponent(message)}`;
+      direct.href = '#express';
     }
   };
   card.syncQuantity = quantity => { input.value = quantity; update(); };
@@ -163,9 +191,13 @@ document.querySelectorAll('.product').forEach((card, index) => {
   plus.onclick = () => { input.value = card.readQuantity() + 1; syncCart(); };
   input.onchange = syncCart;
   input.oninput = () => { if (input.value !== '') syncCart(); };
-  if (direct) direct.addEventListener('click', () => {
+  if (direct) direct.addEventListener('click', event => {
+    event.preventDefault();
     if (!card.readQuantity()) input.value = 1;
     syncCart();
+    status.textContent = '';
+    dialog.showModal();
+    document.querySelector('#order-name').focus();
   });
   controls.append(minus, input, plus);
   picker.append(label, controls);
@@ -189,12 +221,10 @@ if (STORE_WHATSAPP) {
   send.textContent = 'تأكيد الطلب عبر واتساب ↗';
   document.querySelector('#order-notice').textContent = 'ثمن الكاش بيبي 119 درهم للواحد. التوفر وثمن التوصيل كيتأكدو فواتساب قبل إتمام الطلب.';
 }
-send.onclick = async () => {
+send.onclick = () => {
   if (!selected.size) return;
-  const message = orderMessage(selected);
-  if (STORE_WHATSAPP) { window.open(`https://wa.me/${STORE_WHATSAPP}?text=${encodeURIComponent(message)}`, '_blank', 'noopener'); return; }
-  try { await navigator.clipboard.writeText(message); status.textContent = 'تنسخ الاستفسار. ما تصيفط حتى طلب دابا.'; }
-  catch { status.textContent = message; status.style.whiteSpace = 'pre-wrap'; }
+  const customer = { name: document.querySelector('#order-name').value, phone: document.querySelector('#order-phone').value, city: document.querySelector('#city').value, address: document.querySelector('#notes').value };
+  checkout(new Map(selected), customer, 'cart', send, status);
 };
 const feedback = document.createElement('p');
 feedback.id = 'cart-feedback';
@@ -230,6 +260,24 @@ cityInput.placeholder = 'مثلاً: برشيد، سطات…';
 cityInput.maxLength = 100;
 const notesLabel = dialog.querySelector('label[for="notes"]');
 notesLabel.before(cityLabel, cityInput);
+const customerFields = document.createElement('div');
+customerFields.className = 'basket-customer-fields';
+for (const [id, labelText, type, autocomplete, placeholder] of [
+  ['order-name', 'الاسم الكامل', 'text', 'name', 'الاسم ديالك'],
+  ['order-phone', 'رقم الهاتف', 'tel', 'tel', '0612345678']
+]) {
+  const label = document.createElement('label');
+  label.htmlFor = id; label.textContent = labelText;
+  const input = document.createElement('input');
+  input.id = id; input.type = type; input.autocomplete = autocomplete;
+  input.placeholder = placeholder; input.required = true; input.maxLength = 100;
+  customerFields.append(label, input);
+}
+cityLabel.before(customerFields);
+notesLabel.textContent = 'العنوان أو ملاحظة (اختياري)';
+const privacyNote = 'المعلومات كتتصيفط لسجل الطلبات قبل فتح واتساب، وكتستعمل لتتبع الطلب والتوصيل.';
+document.querySelector('#order-notice').textContent = `ثمن الكاش بيبي 119 درهم للواحد. ${privacyNote}`;
+expressForm.querySelector('small').textContent = privacyNote;
 render();
 
 // Product photos follow the pointer while preserving normal touch scrolling.
